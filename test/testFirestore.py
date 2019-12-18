@@ -1,5 +1,8 @@
+import os
 from typing import List
 from unittest import TestCase
+
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'google-cloud.json'
 
 from firestore_ci import FirestoreDocument, ORDER_DESCENDING, FirestoreCIError
 
