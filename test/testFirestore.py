@@ -82,36 +82,34 @@ class FirestoreTest(TestCase):
         # Nayan - Client #1
         self.assertEqual(f"/users/{self.nayan.id}", str(self.nayan))
         self.assertEqual('nayan@crazyideas.co.in', self.nayan.email)
-        self.assertEqual('/clients/None', str(self.nayan.clients[0]))
+        self.assertEqual(f"/clients/{self.nayan.clients[0].id}", str(self.nayan.clients[0]))
         self.assertEqual('Nayan', self.nayan.clients[0].name)
         self.assertEqual('Mumbai', self.nayan.clients[0].address)
         # Avani - Client #1
         self.assertEqual(f"/users/{self.avani.id}", str(self.avani))
         self.assertEqual('avani@crazyideas.co.in', self.avani.email)
-        self.assertEqual('/clients/None', str(self.avani.clients[0]))
+        self.assertEqual(f"/clients/{self.avani.clients[0].id}", str(self.avani.clients[0]))
         self.assertEqual('Avani', self.avani.clients[0].name)
         self.assertEqual('Netherlands', self.avani.clients[0].address)
         # Avani - Client #2
-        self.assertEqual('/clients/None', str(self.avani.clients[1]))
+        self.assertEqual(f"/clients/{self.avani.clients[1].id}", str(self.avani.clients[1]))
         self.assertEqual('Hiten', self.avani.clients[1].name)
         self.assertEqual('Netherlands', self.avani.clients[1].address)
         self.assertEqual('Individual', self.avani.clients[1].account_type)
         # Avani - Client #3
-        self.assertEqual('/clients/None', str(self.avani.clients[2]))
+        self.assertEqual(f"/clients/{self.avani.clients[2].id}", str(self.avani.clients[2]))
         self.assertEqual('Crazy Ideas', self.avani.clients[2].name)
         self.assertEqual('Mumbai', self.avani.clients[2].address)
         self.assertEqual('Partnership Firm', self.avani.clients[2].account_type)
 
     def test_read(self):
         # Set ID in dict and test cascade_to_dict
-        nayan: User = User.objects.cascade.filter_by(name='Nayan').first()
-        avani: User = User.objects.cascade.filter_by(name='Avani').first()
-        self.nayan_dict['id'] = nayan.id
-        self.nayan_dict['clients'][0]['id'] = nayan.clients[0].id
-        self.avani_dict['id'] = avani.id
-        self.avani_dict['clients'][0]['id'] = avani.clients[0].id
-        self.avani_dict['clients'][1]['id'] = avani.clients[1].id
-        self.avani_dict['clients'][2]['id'] = avani.clients[2].id
+        self.nayan_dict['id'] = self.nayan.id
+        self.nayan_dict['clients'][0]['id'] = self.nayan.clients[0].id
+        self.avani_dict['id'] = self.avani.id
+        self.avani_dict['clients'][0]['id'] = self.avani.clients[0].id
+        self.avani_dict['clients'][1]['id'] = self.avani.clients[1].id
+        self.avani_dict['clients'][2]['id'] = self.avani.clients[2].id
         self.assertEqual(self.avani_dict, User.objects.cascade.filter_by(name='Avani').first().cascade_to_dict())
         self.assertEqual(self.nayan_dict, User.objects.cascade.filter_by(name='Nayan').first().cascade_to_dict())
         # Test filter_by and first
@@ -148,27 +146,27 @@ class FirestoreTest(TestCase):
         self.assertRaises(FirestoreCIError, User.objects.order_by, 'email', 'desc')
 
     def test_update(self):
-        # Test on objects returned by create (Works only on objects that do not have child objects)
-        self.nayan.name = 'Nayan Zaveri'
-        self.assertEqual(False, self.nayan.save())  # Will not save on the parent object
-        self.assertEqual('Nayan', User.get_by_id(self.nayan.id).name)
-        self.nayan.clients[0].name = 'Nayan Zaveri'
-        self.assertEqual(False, self.nayan.save(cascade=True))  # Will not save on the child object
-        self.assertIsNone(Client.objects.filter_by(name='Nayan Zaveri').first())
+        # Test on objects returned by create
+        self.nayan.name = 'NHZ'
+        self.assertEqual(True, self.nayan.save())  # Will save on the parent object
+        self.assertEqual('NHZ', User.get_by_id(self.nayan.id).name)
+        self.nayan.clients[0].name = 'NHZ'
+        self.assertEqual(True, self.nayan.save(cascade=True))  # Will save on the child object
+        self.assertIsNotNone(Client.objects.filter_by(name='NHZ').first())
         new_client = Client.create_from_dict({'name': 'Nayan HUF', 'address': 'India', 'account_type': 'HUF'})
         self.assertEqual('India', new_client.address)
         new_client.address = 'Mumbai'
-        self.assertEqual(True, new_client.save())  # Will save since it does not contain any child objects
+        self.assertEqual(True, new_client.save())  # Will save
         self.assertEqual('Mumbai', Client.objects.filter_by(name='Nayan HUF').first().address)
-        # Better to retrieve the objects and save
-        nayan: User = User.objects.cascade.filter_by(name='Nayan').first()
+        # Save after retrieving the objects
+        nayan: User = User.objects.cascade.filter_by(name='NHZ').first()
         nayan.name = 'Nayan Zaveri'
         self.assertEqual(True, nayan.save())  # Will save on the parent object
         self.assertEqual('Nayan Zaveri', User.get_by_id(nayan.id).name)
         nayan.name = 'Nayan'
         nayan.clients[0].address = 'Dallas/Fort Worth'
         self.assertEqual(True, nayan.save(cascade=True))  # Will now save on the child object also
-        self.assertEqual('Dallas/Fort Worth', Client.objects.filter_by(name='Nayan').first().address)
+        self.assertEqual('Dallas/Fort Worth', Client.objects.filter_by(name='NHZ').first().address)
         self.assertEqual('Nayan', User.get_by_id(nayan.id).name)
         # Link a child object manually without using cascade
         nayan: User = User.objects.filter_by(name='Nayan').first()  # Don't use cascade here
@@ -179,10 +177,6 @@ class FirestoreTest(TestCase):
         self.assertEqual('Nayan HUF', nayan.clients[1].name)
 
     def test_delete(self) -> None:
-        # Test delete on created objects
-        self.assertEqual(str(), self.nayan.delete())  # Will not delete since it contains child reference as None
-        self.assertEqual(str(), self.nayan.delete(cascade=True))
-        self.assertEqual('Nayan', User.get_by_id(self.nayan.id).name)
         # Test direct delete of object with no child
         deleted_id = Client.objects.filter_by(name='Nayan').delete()
         self.assertNotEqual(str(), deleted_id)  # Will delete
