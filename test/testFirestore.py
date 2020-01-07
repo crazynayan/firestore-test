@@ -4,7 +4,7 @@ from unittest import TestCase
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'google-cloud.json'
 
-from firestore_ci import FirestoreDocument, ORDER_DESCENDING, FirestoreCIError
+from firestore_ci import FirestoreDocument, FirestoreCIError
 
 
 class User(FirestoreDocument):
@@ -124,8 +124,12 @@ class FirestoreTest(TestCase):
         self.assertEqual(f"/users/{avani.id}", str(avani))
         self.assertEqual('Avani', avani.name)
         self.assertListEqual(['Avani', 'Hiten', 'Crazy Ideas'], [client.name for client in avani.clients])
+        nayan = Client.objects.filter('contacts', Client.objects.ARRAY_CONTAINS, '+91 91234 50002').first()
+        self.assertEqual('Nayan', nayan.name)
+        clients = Client.objects.filter('name', Client.objects.IN, ['Avani', 'Hiten']).get()
+        self.assertEqual(2, len(clients))
         # Test order_by and limit
-        clients: List[Client] = Client.objects.order_by('name', ORDER_DESCENDING).limit(100).get()
+        clients: List[Client] = Client.objects.order_by('name', Client.objects.ORDER_DESCENDING).limit(100).get()
         self.assertListEqual(['Nayan', 'Hiten', 'Crazy Ideas', 'Avani'], [client.name for client in clients])
         clients: List[Client] = Client.objects.order_by('name').limit(3).get()
         self.assertListEqual(['Avani', 'Crazy Ideas', 'Hiten'], [client.name for client in clients])
