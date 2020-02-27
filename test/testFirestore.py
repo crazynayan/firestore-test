@@ -4,7 +4,7 @@ from unittest import TestCase
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'google-cloud.json'
 
-from firestore_ci import FirestoreDocument, FirestoreCIError
+from firestore_ci.firestore_ci import FirestoreDocument, FirestoreCIError
 
 
 class User(FirestoreDocument):
@@ -14,6 +14,9 @@ class User(FirestoreDocument):
         self.name: str = ''
         self.email: str = ''
         self.clients: List[Client] = list()
+
+
+User.init('users')
 
 
 class Client(FirestoreDocument):
@@ -27,8 +30,7 @@ class Client(FirestoreDocument):
         self.contacts: List[str] = list()
 
 
-User.init()
-Client.init()
+Client.init('clients')
 
 
 class FirestoreTest(TestCase):
@@ -118,7 +120,7 @@ class FirestoreTest(TestCase):
         self.assertEqual('Nayan', nayan.name)
         nayan_client: Client = Client.objects.filter_by(name='Nayan').first()
         self.assertListEqual([nayan_client.id], nayan.clients)
-        # Test filter, cascade and get
+        # Test filter, cascade and get and ARRAY_CONTAINS and IN
         avani: List[User] = User.objects.cascade.filter('email', '==', 'avani@crazyideas.co.in').get()
         avani: User = next(iter(avani))  # or avani: User = avani[0]
         self.assertEqual(f"/users/{avani.id}", str(avani))
