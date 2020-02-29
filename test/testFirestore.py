@@ -4,7 +4,8 @@ from unittest import TestCase
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'google-cloud.json'
 
-from firestore_ci.firestore_ci import FirestoreDocument, FirestoreCIError
+from firestore_ci import FirestoreDocument
+from firestore_ci.firestore_ci import FirestoreCIError
 
 
 class User(FirestoreDocument):

@@ -3,7 +3,7 @@ import threading
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'google-cloud.json'
 
-from firestore_ci.firestore_ci import FirestoreDocument
+from firestore_ci import FirestoreDocument
 
 
 class Bid(FirestoreDocument):
