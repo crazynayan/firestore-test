@@ -193,8 +193,8 @@ class FirestoreTest(TestCase):
         self.assertEqual(1, len(nayan.clients))
         self.assertEqual(deleted_id, nayan.clients[0])
         nayan_whole = User.objects.cascade.filter_by(name='Nayan').first()
-        self.assertEqual(1, len(nayan_whole.clients))
-        self.assertIsNone(nayan_whole.clients[0])
+        self.assertEqual(0, len(nayan_whole.clients))
+        self.assertListEqual(list(), nayan_whole.clients)
         # Fix it by removing the dangling reference
         nayan.clients.remove(deleted_id)
         nayan.save()
