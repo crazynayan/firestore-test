@@ -29,6 +29,10 @@ class Client(FirestoreDocument):
         self.account_type: str = ''
         self.amount_pending: int = 0
         self.contacts: List[str] = list()
+        self.address_map: dict = {
+            'city': str(),
+            'country': str(),
+        }
 
 
 Client.init('clients')
@@ -46,6 +50,7 @@ class FirestoreTest(TestCase):
                     'account_type': 'Individual',
                     'amount_pending': 5000,
                     'contacts': ['+91 91234 50001', '+91 91234 50002'],
+                    'address_map': {'city': 'Mumbai', 'country': 'India'},
                 },
             ]
         }
@@ -59,6 +64,7 @@ class FirestoreTest(TestCase):
                     'account_type': 'Individual',
                     'amount_pending': 1100,
                     'contacts': ['+31 612 345 001'],
+                    'address_map': {'city': 'Maastricht', 'country': 'Netherlands'},
                 },
                 {
                     'name': 'Hiten',
@@ -66,6 +72,7 @@ class FirestoreTest(TestCase):
                     'account_type': 'Individual',
                     'amount_pending': 0,
                     'contacts': [],
+                    'address_map': {'city': 'Maastricht', 'country': 'Netherlands'},
                 },
                 {
                     'name': 'Crazy Ideas',
@@ -73,13 +80,15 @@ class FirestoreTest(TestCase):
                     'account_type': 'Partnership Firm',
                     'amount_pending': 0,
                     'contacts': ['+91 91234 50011', '+91 91234 50012', '+91 91234 50013'],
+                    'address_map': {'city': 'Mumbai', 'country': 'India'},
                 },
             ]
         }
-        User.objects.cascade.filter_by(name='Nayan').delete()
-        User.objects.cascade.filter_by(name='Avani').delete()
-        self.nayan: User = User.create_from_dict(self.nayan_dict)
-        self.avani: User = User.create_from_dict(self.avani_dict)
+        # User.objects.cascade.filter_by(name='Nayan').delete()
+        # User.objects.cascade.filter_by(name='Avani').delete()
+        users: List[User] = User.create_from_list_of_dict([self.nayan_dict, self.avani_dict])
+        self.nayan = next(user for user in users if user.name == 'Nayan')
+        self.avani = next(user for user in users if user.name == 'Avani')
 
     def test_create(self):
         # Nayan - Client #1
@@ -221,6 +230,19 @@ class FirestoreTest(TestCase):
         avani.clients.remove(deleted_id)
         avani.save()
         self.assertEqual(1, len(User.objects.filter_by(name='Avani').first().clients))
+
+    def test_bulk_update(self):
+        clients = Client.objects.get()
+        for client in clients:
+            client.amount_pending += 100
+        results = Client.save_all(clients)
+        self.assertTrue(all(results))
+        self.assertEqual(clients, Client.objects.get())
+
+    def test_filter_map(self):
+        clients = Client.objects.filter('address_map.city', '==', 'Mumbai').get()
+        self.assertEqual(2, len(clients))
+        self.assertSetEqual({'Nayan', 'Crazy Ideas'}, {client.name for client in clients})
 
     def tearDown(self) -> None:
         User.objects.cascade.filter_by(name='Nayan').delete()
