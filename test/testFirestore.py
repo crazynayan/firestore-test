@@ -288,6 +288,35 @@ class FirestoreTest(TestCase):
         self.assertEqual(5, len(clients))
         Client.objects.filter_by(account_type="Company").delete()
 
+    def test_no_orm(self):
+        clients = Client.objects.no_orm.filter_by(address="Netherlands").get()
+        self.assertSetEqual({"Avani", "Hiten"}, {client["name"] for client in clients})
+        self.assertIn("id", clients[0])
+        self.assertIn("id", clients[1])
+        self.assertEqual(7, len(clients[0]))
+        client = Client.objects.no_orm.order_by("amount_pending", Client.objects.ORDER_DESCENDING).first()
+        self.assertEqual("Nayan", client["name"])
+        self.assertEqual(7, len(client))
+        self.assertIn("id", client)
+        client = Client.objects.no_orm.create_from_dict({"name": "Purvi"})
+        self.assertEqual("Purvi", client["name"])
+        self.assertEqual(0, client["amount_pending"])
+        self.assertEqual(7, len(client))
+        self.assertIn("id", client)
+        Client.objects.filter_by(name="Purvi").delete()
+        companies = [
+            {"name": "company 1", "account_type": "Company"},
+            {"name": "company 2", "account_type": "Company"},
+            {"name": "company 3", "account_type": "Company"},
+        ]
+        clients = Client.objects.no_orm.truncate.create_from_list_of_dict(companies)
+        self.assertSetEqual({"company 1", "company 2", "company 3"}, {client["name"] for client in clients})
+        self.assertEqual(3, len(clients))
+        self.assertIn("id", clients[0])
+        self.assertNotIn("amount_pending", clients[1])
+        self.assertEqual(3, len(clients[2]))
+        Client.objects.filter_by(account_type="Company").delete()
+
     def tearDown(self) -> None:
         User.objects.cascade.filter_by(name="Nayan").delete()
         User.objects.cascade.filter_by(name="Avani").delete()
