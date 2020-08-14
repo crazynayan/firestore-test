@@ -84,8 +84,6 @@ class FirestoreTest(TestCase):
                 },
             ]
         }
-        # User.objects.cascade.filter_by(name="Nayan").delete()
-        # User.objects.cascade.filter_by(name="Avani").delete()
         users: List[User] = User.create_from_list_of_dict([self.nayan_dict, self.avani_dict])
         self.nayan = next(user for user in users if user.name == "Nayan")
         self.avani = next(user for user in users if user.name == "Avani")
@@ -251,7 +249,7 @@ class FirestoreTest(TestCase):
         self.assertEqual("Hiten", query1.first().name)
         self.assertEqual("Avani", query2.first().name)
         # With Truncate
-        client = Client.objects.truncate.create_from_dict({
+        client = Client.objects.truncate.create({
             "name": "Purvi",
             "address": "Mumbai",
             "account_type": "Individual"
@@ -261,7 +259,7 @@ class FirestoreTest(TestCase):
         self.assertEqual(2, len(clients))
         Client.objects.filter_by(name="Purvi").delete()
         # Without Truncate
-        client = Client.objects.create_from_dict({
+        client = Client.objects.create({
             "name": "Purvi",
             "address": "Mumbai",
             "account_type": "Individual"
@@ -276,17 +274,16 @@ class FirestoreTest(TestCase):
             {"name": "company 2", "account_type": "Company"},
             {"name": "company 3", "account_type": "Company"},
         ]
-        clients = Client.objects.truncate.create_from_list_of_dict(companies)
-        self.assertSetEqual({"company 1", "company 2", "company 3"}, {client.name for client in clients})
+        clients = Client.objects.truncate.create_all(companies)
+        self.assertListEqual(["company 1", "company 2", "company 3"], [client.name for client in clients])
         clients = Client.objects.filter_by(amount_pending=0).get()
         self.assertEqual(2, len(clients))
         Client.objects.filter_by(account_type="Company").delete()
         # Create list of dicts without Truncate
-        clients = Client.objects.create_from_list_of_dict(companies)
-        self.assertSetEqual({"company 1", "company 2", "company 3"}, {client.name for client in clients})
+        clients = Client.objects.create_all(companies)
+        self.assertListEqual(["company 1", "company 2", "company 3"], [client.name for client in clients])
         clients = Client.objects.filter_by(amount_pending=0).get()
         self.assertEqual(5, len(clients))
-        Client.objects.filter_by(account_type="Company").delete()
 
     def test_no_orm(self):
         clients = Client.objects.no_orm.filter_by(address="Netherlands").get()
@@ -298,7 +295,7 @@ class FirestoreTest(TestCase):
         self.assertEqual("Nayan", client["name"])
         self.assertEqual(7, len(client))
         self.assertIn("id", client)
-        client = Client.objects.no_orm.create_from_dict({"name": "Purvi"})
+        client = Client.objects.no_orm.create({"name": "Purvi"})
         self.assertEqual("Purvi", client["name"])
         self.assertEqual(0, client["amount_pending"])
         self.assertEqual(7, len(client))
@@ -309,14 +306,54 @@ class FirestoreTest(TestCase):
             {"name": "company 2", "account_type": "Company"},
             {"name": "company 3", "account_type": "Company"},
         ]
-        clients = Client.objects.no_orm.truncate.create_from_list_of_dict(companies)
-        self.assertSetEqual({"company 1", "company 2", "company 3"}, {client["name"] for client in clients})
+        clients = Client.objects.no_orm.truncate.create_all(companies)
+        self.assertListEqual(["company 1", "company 2", "company 3"], [client["name"] for client in clients])
         self.assertEqual(3, len(clients))
         self.assertIn("id", clients[0])
         self.assertNotIn("amount_pending", clients[1])
         self.assertEqual(3, len(clients[2]))
-        Client.objects.filter_by(account_type="Company").delete()
+
+    def test_save_all(self):
+        clients = Client.objects.get()
+        clients.sort(key=lambda item: (item.amount_pending, item.name))
+        for client in clients:
+            client.amount_pending += 100
+        clients: List[Client] = Client.objects.save_all(clients)  # Document to Document
+        self.assertListEqual([100, 100, 1200, 5100], [client.amount_pending for client in clients])
+        # Test save
+        clients[0].address = "Bangalore"
+        client = Client.objects.no_orm.save(clients[0])  # Document to Dict
+        self.assertEqual("Bangalore", client["address"])
+        # If one of the ID is corrupted then nothing is changed
+        clients[2].set_id("")
+        for client in clients:
+            client.amount_pending += 100
+        clients = Client.objects.save_all(clients)
+        self.assertListEqual(list(), clients)
+        # Test with no_orm and truncate
+        clients: List[dict] = Client.objects.no_orm.get()
+        clients.sort(key=lambda item: (item["amount_pending"], item["name"]))
+        self.assertEqual([100, 100, 1200, 5100], [client["amount_pending"] for client in clients])
+        self.assertIn("id", clients[2])
+        # Test with no_orm and truncate
+        for client in clients:
+            client["amount_pending"] -= 100
+        clients: List[dict] = Client.objects.truncate.no_orm.save_all(clients)  # Dict to Dict
+        self.assertNotIn("amount_pending", clients[0])
+        self.assertNotIn("amount_pending", clients[1])
+        self.assertIn("amount_pending", clients[2])
+        self.assertIn("amount_pending", clients[3])
+        self.assertEqual(4, sum(1 if "id" in client else 0 for client in clients))
+        self.assertListEqual([6, 5, 7, 7], [len(client) for client in clients])
+        # Test you cannot add a new field in save
+        clients[0]["new_field"] = "new data"
+        client = Client.objects.no_orm.save(clients[0])
+        self.assertNotIn("new_field", client)
+        # Test save
+        clients[1]["address"] = "Delhi"
+        client = Client.objects.save(clients[1])  # Dict to Document
+        self.assertEqual("Delhi", client.address)
 
     def tearDown(self) -> None:
-        User.objects.cascade.filter_by(name="Nayan").delete()
-        User.objects.cascade.filter_by(name="Avani").delete()
+        User.objects.delete()
+        Client.objects.delete()
