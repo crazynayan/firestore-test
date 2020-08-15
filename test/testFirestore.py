@@ -353,6 +353,13 @@ class FirestoreTest(TestCase):
         clients[1]["address"] = "Delhi"
         client = Client.objects.save(clients[1])  # Dict to Document
         self.assertEqual("Delhi", client.address)
+        # Test no_orm save all from orm.
+        clients = Client.objects.get()
+        clients.sort(key=lambda item: (item.amount_pending, item.name))
+        for client in clients:
+            client.amount_pending += 100
+        clients: List[dict] = Client.objects.truncate.no_orm.save_all(clients)  # Document to Document
+        self.assertListEqual([100, 100, 1200, 5100], [client["amount_pending"] for client in clients])
 
     def tearDown(self) -> None:
         User.objects.delete()
